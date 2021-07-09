@@ -13,22 +13,29 @@
 
 <form th:method="PATCH" th:action="@{/{id}(id=${user.getUserId()})}" th:object="${user}">
 
+    <input type="hidden" th:field="*{userId}" id="id"/>
     <label for="name">Enter name: </label>
     <input type="text" th:field="*{userName}" id="name" />
     <br/>
     <label for="password">Enter password: </label>
     <input type="text" th:field="*{userPassword}" id="password" />
     <br/>
-    <input type="hidden" th:field="*{userId}" id="userId" />
     <div>
         <p>Choose role: </p>
-        Admin: <input type="checkbox" name="roleAdmin" th:checked="${roleAdmin}">
-        <br>
-        User: <input type="checkbox" name="roleUser" th:checked="${roleUser}">
-        <br>
+
+        <select name="rolesSelected" multiple required size="6">
+            <option disabled selected>select role</option>
+            <div  th:each="role : ${allRoles}">
+                <option th:text="${role.getRoleName()}" th:value="${role.getRoleId()}"
+                        th:field="*{roles}" name="roles"/>
+            </div>
+        </select>
+
     </div>
-    <input type="submit" value="Create!"/>
+    <input type="submit" value="Update!"/>
 </form>
+<br/>
+<a href="/users">back</a>
 
 </body>
 </html>

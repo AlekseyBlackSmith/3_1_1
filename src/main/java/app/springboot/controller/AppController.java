@@ -1,26 +1,26 @@
 package app.springboot.controller;
 
-
-import app.springboot.model.Role;
 import app.springboot.model.User;
+import app.springboot.service.RoleService;
 import app.springboot.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.security.Principal;
 
 @Controller
 public class AppController {
     private final UserService userService;
+    private final RoleService roleService;
 
     @Autowired
-    public AppController(UserService userService) {
+    public AppController(UserService userService, RoleService roleService) {
         this.userService = userService;
+        this.roleService = roleService;
     }
 
     @GetMapping("/")
@@ -33,89 +33,72 @@ public class AppController {
         return "login";
     }
 
-    //метод отправляет на страницу с переданным пользователем.
-    //подтянется текущий пользователь из аутентификации. (User увидит только себя)
     @GetMapping(value = "/show")
-    public String userPage(Model model) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        model.addAttribute("user", userService.getByUserName(authentication.getName()));
-        model.addAttribute("roles", userService.getByUserName(authentication.getName()).getRoles());
+    public String userPage(Model model, Principal principal) {
+        User currentUser = userService.getUserByNameWithRoles(principal.getName());
+        model.addAttribute("user", currentUser);
+        model.addAttribute("roles", currentUser.getRoles());
         return "show";
     }
 
-    //получая такой запрос мы получаем id интересующего нас пользователя,
-    //находим его и отправляем с моделью на страницу show (Admin увидит любого)
     @GetMapping("/{id}")
     public String showUser(@PathVariable("id") Long id, Model model) {
-        model.addAttribute("user", userService.getById(id));
-        model.addAttribute("roles", userService.getById(id).getRoles());
+        User user = userService.getUserByIdWithRoles(id);
+        model.addAttribute("user", user);
+        model.addAttribute("roles", user.getRoles());
         return "show";
     }
 
-    //метод отправляет на страницу со всеми пользователями
     @GetMapping("/users")
     public String getAllUsers(Model model) {
-        model.addAttribute("users", userService.listUsers());
+        model.addAttribute("users", userService.getAllUsers());
         return "users";
     }
 
-    //отправляем в форму new пустрого user'a
     @GetMapping("/new")
-    public String newUser(@ModelAttribute("user") User user) {
-        return "new";
+    public ModelAndView newUser(ModelAndView mav) {
+        mav.addObject("user", new User());
+        mav.addObject("allRoles", roleService.getAllRoles());
+        mav.setViewName("new");
+        return mav;
     }
 
-    //обработка метода POST с полученным user'ом, получение ролей, назначение их user'у
-    @PostMapping("/users")
-    public String create(@RequestParam(name="roleAdmin", required = false) boolean isAdmin,
-                         @RequestParam(name = "roleUser", required = false) boolean isUser,
-                         @ModelAttribute("user") User user) {
-        user.setRoles(getRolesFromForms(isAdmin, isUser));
-        userService.save(user);
-
-        return "redirect:/users";
+    @PostMapping("/new")
+    public ModelAndView create(ModelAndView mav,
+                               @ModelAttribute("user") User user,
+                               @RequestParam("rolesSelected") Long[] rolesId) {
+        for(Long roleId : rolesId) {
+            user.setRole(roleService.getRoleById(roleId));
+        }
+        userService.addUser(user);
+        mav.addObject("users", userService.getAllUsers());
+        mav.setViewName("users");
+        return mav;
     }
 
-    // получение запроса на апгрейд, отправка user'a на update
+
     @GetMapping("/{id}/update")
     public String edit(Model model, @PathVariable("id") Long id) {
-        model.addAttribute("user", userService.getById(id));
+        model.addAttribute("user", userService.getUserById(id));
+        model.addAttribute("allRoles", roleService.getAllRoles());
         return "update";
     }
 
-    //получение обновленного пользователя из формы
     @PatchMapping("/{id}")
-    public String edit(@ModelAttribute("user") User user,
-                       @PathVariable("id") Long id,
-                       @RequestParam(name="roleAdmin", required = false) boolean isAdmin,
-                       @RequestParam(name = "roleUser", required = false) boolean isUser) {
-        user.setRoles(getRolesFromForms(isAdmin, isUser));
-        userService.save(user);
+    public String update(@ModelAttribute("user") User user,
+                         @RequestParam("rolesSelected") Long[] rolesId) {
+        for(Long roleId : rolesId) {
+            user.setRole(roleService.getRoleById(roleId));
+        }
+        userService.updateUser(user);
         return "redirect:/users";
     }
 
-    //удаление по id
+    @PreAuthorize("hasAuthority('ADMIN')")
     @DeleteMapping("/{id}")
     public String delite(@PathVariable("id") Long id) {
-        userService.removeById(id);
+        userService.removeUserById(id);
         return "redirect:/users";
-    }
-
-
-    //вспомогательный метод
-    private Set<Role> getRolesFromForms(boolean isAdmin, boolean isUser) {
-        Set<Role> newRoles = new HashSet<>();
-
-        if(isAdmin) {
-            newRoles.add(new Role(1L, "ROLE_ADMIN"));
-        }
-        if(isUser) {
-            newRoles.add(new Role(2L, "ROLE_USER"));
-        }
-        if(newRoles.size() == 0) {
-            newRoles.add(new Role(2L, "ROLE_USER"));
-        }
-        return newRoles;
     }
 
 }

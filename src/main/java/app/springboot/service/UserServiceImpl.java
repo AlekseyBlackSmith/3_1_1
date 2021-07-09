@@ -1,86 +1,62 @@
 package app.springboot.service;
 
+import app.springboot.dao.UserDao;
 import app.springboot.model.User;
-import app.springboot.repository.RoleRepository;
-import app.springboot.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Transactional
 public class UserServiceImpl implements UserService{
-    private RoleRepository roleRepository;
-    private UserRepository userRepository;
+    private final UserDao userDao;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
-    public UserServiceImpl(RoleRepository roleRepository, UserRepository userRepository) {
-        this.roleRepository = roleRepository;
-        this.userRepository = userRepository;
+    public UserServiceImpl(UserDao userDao, BCryptPasswordEncoder passwordEncoder) {
+        this.userDao = userDao;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+
+    @Override
+    public void addUser(User user) {
+        user.setUserPassword(passwordEncoder.encode(user.getUserPassword()));
+        userDao.addUser(user);
     }
 
     @Override
-    public void save(User user) {
-        userRepository.save(user);
+    public void removeUserById(Long id) {
+        userDao.removeUserById(id);
     }
 
     @Override
-    public void removeById(Long id) {
-        userRepository.deleteById(id);
+    public void updateUser(User user) {
+        User oldUser = userDao.getUserById(user.getUserId());
+        if(!oldUser.getUserPassword().equals(user.getUserPassword())) {
+            user.setUserPassword(passwordEncoder.encode(user.getUserPassword()));
+        }
+        userDao.updateUser(user);
     }
 
     @Override
-    public User getById(Long id) {
-        return userRepository.getOne(id);
+    public User getUserById(Long id) {
+        return userDao.getUserById(id);
     }
 
     @Override
-    public User getByUserName(String userName) {
-        return userRepository.getByUserName(userName);
+    public User getUserByIdWithRoles(Long id) {
+        return userDao.getUserByIdWithRoles(id);
     }
 
     @Override
-    public List<User> listUsers() {
-        return userRepository.findAll();
+    public User getUserByNameWithRoles(String name) {
+        return userDao.getUserByNameWithRoles(name);
     }
 
-
-//    private UserDao userDao;
-//
-//    @Autowired
-//    public UserServiceImpl(UserDao userDao) {
-//        this.userDao = userDao;
-//    }
-//
-//    @Override
-//    @Transactional
-//    public void save(User user) {
-//        userDao.save(user);
-//    }
-//
-//    @Override
-//    @Transactional
-//    public void removeById(Long id) {
-//        userDao.removeById(id);
-//    }
-//
-//
-//    @Override
-//    @Transactional
-//    public User getById(Long id) {
-//        return userDao.getById(id);
-//    }
-//
-//    @Override
-//    @Transactional
-//    public User getByUserName(String name) {
-//        return userDao.getByUserName(name);
-//    }
-//
-//    @Override
-//    @Transactional
-//    public List<User> listUsers() {
-//        return userDao.listUsers();
-//    }
-
+    @Override
+    public List<User> getAllUsers() {
+        return userDao.getAllUsers();
+    }
 }
